@@ -32,6 +32,7 @@ public class PlayerManager : MonoBehaviour
         if (currentPlayer != null) return;
 
         currentPlayer = Instantiate(playerPrefab, spawnPoint.position, Quaternion.identity);
+        CameraManager.Instance?.RebindToPlayer(currentPlayer);
     }
 
     public GameObject GetPlayer()

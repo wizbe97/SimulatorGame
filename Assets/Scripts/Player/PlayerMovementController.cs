@@ -6,6 +6,9 @@ public class PlayerMovementController : MonoBehaviour
 {
     [SerializeField] private PlayerStatsSO stats;
 
+    // NEW: camera reference (assign in Inspector or auto-grab Main Camera)
+    [SerializeField] private Transform cameraTransform;
+
     private Rigidbody rb;
     private PlayerInputHandler inputHandler;
 
@@ -22,12 +25,14 @@ public class PlayerMovementController : MonoBehaviour
 
         rb.interpolation = RigidbodyInterpolation.Interpolate;
         rb.constraints = RigidbodyConstraints.FreezeRotation; // prevent tipping
+
+        if (cameraTransform == null && Camera.main != null)
+            cameraTransform = Camera.main.transform;
     }
 
     private void OnEnable()
     {
         if (inputHandler == null) return;
-
         inputHandler.OnJump += HandleJump;
         inputHandler.OnSprintStart += HandleSprintStart;
         inputHandler.OnSprintEnd += HandleSprintEnd;
@@ -36,7 +41,6 @@ public class PlayerMovementController : MonoBehaviour
     private void OnDisable()
     {
         if (inputHandler == null) return;
-
         inputHandler.OnJump -= HandleJump;
         inputHandler.OnSprintStart -= HandleSprintStart;
         inputHandler.OnSprintEnd -= HandleSprintEnd;
@@ -45,6 +49,17 @@ public class PlayerMovementController : MonoBehaviour
     private void Update()
     {
         moveInput = inputHandler != null ? inputHandler.MoveInput : Vector2.zero;
+
+        if (cameraTransform == null && Camera.main != null)
+            cameraTransform = Camera.main.transform;
+
+        if (cameraTransform != null)
+        {
+            var e = transform.eulerAngles;
+            e.y = cameraTransform.eulerAngles.y;
+            transform.eulerAngles = e;
+        }
+
         CheckGround();
     }
 
@@ -62,16 +77,14 @@ public class PlayerMovementController : MonoBehaviour
 
         if (moveInput != Vector2.zero)
         {
-            // Convert input to world space relative to the player's facing
             Vector3 moveDir = new Vector3(moveInput.x, 0f, moveInput.y);
-            moveDir = transform.TransformDirection(moveDir).normalized;
+            moveDir = transform.TransformDirection(moveDir);
 
             float targetSpeed = isSprinting ? stats.SprintSpeed : stats.WalkSpeed;
             Vector3 desired = moveDir * targetSpeed;
 
             Vector3 velocityChange = desired - velocity;
 
-            // Limit horizontal acceleration per physics step
             float maxDelta = stats.MaxVelocityChange;
             velocityChange.x = Mathf.Clamp(velocityChange.x, -maxDelta, maxDelta);
             velocityChange.z = Mathf.Clamp(velocityChange.z, -maxDelta, maxDelta);
@@ -81,19 +94,14 @@ public class PlayerMovementController : MonoBehaviour
         }
         else
         {
-            // Dampen horizontal velocity when no input
             const float dampingFactor = 5f;
             Vector3 horizVel = new Vector3(velocity.x, 0f, velocity.z);
             Vector3 decel = -horizVel * dampingFactor * Time.fixedDeltaTime;
 
             if (horizVel.sqrMagnitude < 0.01f)
-            {
                 rb.velocity = new Vector3(0f, rb.velocity.y, 0f);
-            }
             else
-            {
                 rb.AddForce(decel, ForceMode.VelocityChange);
-            }
         }
     }
 
@@ -113,7 +121,6 @@ public class PlayerMovementController : MonoBehaviour
     {
         if (stats == null) { isGrounded = false; return; }
 
-        // Raycast slightly below the feet on collision layers
         Vector3 origin = new Vector3(
             transform.position.x,
             transform.position.y - (transform.localScale.y * 0.5f),

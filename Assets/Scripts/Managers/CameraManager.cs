@@ -1,55 +1,70 @@
 using UnityEngine;
+using Cinemachine;
 
-[RequireComponent(typeof(PlayerInputHandler))]
 public class CameraManager : MonoBehaviour
 {
+    public static CameraManager Instance { get; private set; }
+
     [Header("References")]
+    [SerializeField] private GameObject player;
+    [SerializeField] private CinemachineVirtualCamera vcam;
     [SerializeField] private CameraControllerSO cameraSettings;
-    [SerializeField] private Camera playerCamera;
-    [SerializeField] private Transform playerRoot; // yaw target (usually the player root)
 
     private PlayerInputHandler inputHandler;
-    private float yaw;
-    private float pitch;
+    private CinemachinePOV pov;
 
     private void Awake()
     {
-        inputHandler = GetComponent<PlayerInputHandler>();
-        if (playerRoot == null) playerRoot = transform;
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+    }
 
-        if (playerCamera != null)
-        {
-            // Apply SO-defined local offset (if any)
-            playerCamera.transform.localPosition = cameraSettings != null
-                ? cameraSettings.CameraLocalOffset
-                : Vector3.zero;
-        }
+    private void Start()
+    {
+        if (vcam == null) vcam = FindObjectOfType<CinemachineVirtualCamera>();
 
-        // Initial cursor state via CursorManager
-        if (cameraSettings != null && cameraSettings.LockCursorOnStart)
-        {
-            CursorManager.Instance?.SetCursorLock(true);
-        }
+        BindPlayerCameraRig();
+        cameraSettings?.ConfigureVcam(vcam);
+
+        pov = vcam != null ? vcam.GetCinemachineComponent<CinemachinePOV>() : null;
+        inputHandler = player != null ? player.GetComponent<PlayerInputHandler>() : null;
     }
 
     private void Update()
     {
-        if (cameraSettings == null || playerCamera == null || inputHandler == null)
-            return;
+        if (pov == null || inputHandler == null || cameraSettings == null) return;
 
         Vector2 look = inputHandler.LookInput;
+        float delta = cameraSettings.MouseSensitivity * 2f * Time.deltaTime;
 
-        float scaledSensitivity = cameraSettings.MouseSensitivity * Time.deltaTime;
-        yaw   += look.x * scaledSensitivity;
-        pitch -= look.y * scaledSensitivity;
+        pov.m_HorizontalAxis.Value += look.x * delta;
 
-        pitch = Mathf.Clamp(pitch, -cameraSettings.MaxLookAngle, cameraSettings.MaxLookAngle);
-
-        // Apply rotations: yaw to player, pitch to camera
-        if (playerRoot != null)
-            playerRoot.rotation = Quaternion.Euler(0f, yaw, 0f);
-
-        playerCamera.transform.localRotation = Quaternion.Euler(pitch, 0f, 0f);
+        float ySign = cameraSettings.InvertY ? 1f : -1f;
+        pov.m_VerticalAxis.Value += look.y * delta * ySign;
     }
 
+    private void BindPlayerCameraRig()
+    {
+        if (vcam == null || player == null) return;
+
+        var followTarget = player.transform.Find("Goggles/CameraFollow");
+        if (followTarget == null)
+        {
+            Debug.LogError("CameraManager: 'Goggles/CameraFollow' not found under Player.");
+            return;
+        }
+
+        vcam.Follow = followTarget;
+        vcam.LookAt = followTarget;
+    }
+
+    public void RebindToPlayer(GameObject newPlayer)
+    {
+        player = newPlayer;
+        inputHandler = player != null ? player.GetComponent<PlayerInputHandler>() : null;
+        BindPlayerCameraRig();
+        cameraSettings?.ConfigureVcam(vcam);
+        pov = vcam != null ? vcam.GetCinemachineComponent<CinemachinePOV>() : null;
+    }
 }

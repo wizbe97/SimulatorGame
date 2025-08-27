@@ -12,7 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8fe0dcf4f25608d40ae9109d6b6fd641, type: 3}
   m_Name: CameraControllerSO
   m_EditorClassIdentifier: 
-  MouseSensitivity: 20
-  MaxLookAngle: 90
-  LockCursorOnStart: 1
-  CameraLocalOffset: {x: 0, y: 0.6, z: 0}
+  Body: 0
+  MouseSensitivity: 10
+  MaxLookAngle: 80
+  InvertY: 1
+  WrapYaw: 1
