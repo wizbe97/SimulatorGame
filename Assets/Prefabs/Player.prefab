@@ -139,9 +139,9 @@ CapsuleCollider:
   m_Enabled: 1
   serializedVersion: 2
   m_Radius: 0.5
-  m_Height: 2
+  m_Height: 1
   m_Direction: 1
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Center: {x: 0, y: -0.5, z: 0}
 --- !u!54 &7256166374999332876
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -194,6 +194,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   stats: {fileID: 11400000, guid: a024e2864fb335d45959af385f8cf899, type: 2}
+  cameraTransform: {fileID: 0}
   CanMove: 1
 --- !u!1 &7181493390937184802
 GameObject:

@@ -23,4 +23,6 @@ MonoBehaviour:
   MaxVelocityChange: 10
   EnableJump: 1
   JumpPower: 5
+  CoyoteTime: 0.15
+  JumpBufferTime: 0.15
   GroundCheckDistance: 0.75
