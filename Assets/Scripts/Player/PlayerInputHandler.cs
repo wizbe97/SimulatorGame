@@ -7,10 +7,6 @@ public class PlayerInputHandler : MonoBehaviour
 
     public Vector2 MoveInput { get; private set; }
     public Vector2 LookInput { get; private set; }
-
-    // Jump polling-style properties:
-    // - JumpDownThisFrame  ~ InputAction.WasPressedThisFrame
-    // - JumpHeld           ~ InputAction.IsPressed
     public bool JumpDownThisFrame { get; private set; }
     public bool JumpHeld { get; private set; }
 
@@ -18,7 +14,6 @@ public class PlayerInputHandler : MonoBehaviour
     public LookDevice LastLookDevice { get; private set; } = LookDevice.Unknown;
 
     public delegate void InputActionEvent();
-    public event InputActionEvent OnJump;         // still exposed for other consumers if you want
     public event InputActionEvent OnSprintStart;
     public event InputActionEvent OnSprintEnd;
 
@@ -37,10 +32,8 @@ public class PlayerInputHandler : MonoBehaviour
         inputActions.Movement.Move.canceled  += OnMoveCanceled;
 
         // Jump
-        // Use started/performed/canceled to mirror WasPressed/IsPressed behavior
-        inputActions.Movement.Jump.started   += OnJumpStarted;   // press began
-        inputActions.Movement.Jump.performed += OnJumpPerformed; // press performed (button press)
-        inputActions.Movement.Jump.canceled  += OnJumpCanceled;  // released
+        inputActions.Movement.Jump.started   += OnJumpStarted;
+        inputActions.Movement.Jump.canceled  += OnJumpCanceled;
 
         // Sprint
         inputActions.Movement.Sprint.performed += OnSprintPerformed;
@@ -57,7 +50,6 @@ public class PlayerInputHandler : MonoBehaviour
         inputActions.Movement.Move.canceled  -= OnMoveCanceled;
 
         inputActions.Movement.Jump.started   -= OnJumpStarted;
-        inputActions.Movement.Jump.performed -= OnJumpPerformed;
         inputActions.Movement.Jump.canceled  -= OnJumpCanceled;
 
         inputActions.Movement.Sprint.performed -= OnSprintPerformed;
@@ -84,11 +76,6 @@ public class PlayerInputHandler : MonoBehaviour
         // This maps to "WasPressedThisFrame"
         JumpDownThisFrame = true;
         JumpHeld = true;
-    }
-
-    private void OnJumpPerformed(InputAction.CallbackContext ctx)
-    {
-        OnJump?.Invoke();
     }
 
     private void OnJumpCanceled(InputAction.CallbackContext ctx)

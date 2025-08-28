@@ -46,15 +46,7 @@ public class PlayerMovementController : MonoBehaviour
 
     private void Update()
     {
-        moveInput = inputHandler.MoveInput;
-
-        // Poll jumping: queue when pressed this frame
-        if (inputHandler.JumpDownThisFrame && stats && stats.EnableJump)
-        {
-            lastJumpPressedTime = Time.time;
-            jumpQueued = true;
-        }
-
+        HandleInput();
         FaceCameraDirection();
         CheckGround();
     }
@@ -68,6 +60,16 @@ public class PlayerMovementController : MonoBehaviour
 
     // ---------------- Movement ----------------
 
+    private void HandleInput()
+    {
+        moveInput = inputHandler.MoveInput;
+
+        if (inputHandler.JumpDownThisFrame && stats && stats.EnableJump)
+        {
+            lastJumpPressedTime = Time.time;
+            jumpQueued = true;
+        }
+    }
     private void HandleMovement()
     {
         if (stats == null) return;
@@ -80,14 +82,13 @@ public class PlayerMovementController : MonoBehaviour
             moveDir = transform.TransformDirection(moveDir);
 
             float speed = isSprinting ? stats.SprintSpeed : stats.WalkSpeed;
-            
+
             // Apex Jump
             bool inApex = !isGrounded && Mathf.Abs(v.y) < stats.ApexDetectionThreshold;
             if (stats.UseApexControl && inApex)
             {
                 speed *= stats.ApexModifier;
             }
-            // --------------------------------------
 
             Vector3 desiredVelocity = moveDir * speed;
 
@@ -115,10 +116,6 @@ public class PlayerMovementController : MonoBehaviour
         }
     }
 
-
-
-    // ---------------- Jumping ----------------
-
     private void HandleJump()
     {
         if (stats == null || !stats.EnableJump)
@@ -132,12 +129,11 @@ public class PlayerMovementController : MonoBehaviour
 
         if (!(jumpQueued && withinBuffer)) return;
 
-        bool canGroundOrCoyote = (isGrounded || withinCoyote);
-        bool canAirJump = (!canGroundOrCoyote && airJumpsUsed < stats.MaxAirJumps);
+        bool canGroundOrCoyote = isGrounded || withinCoyote;
+        bool canAirJump = !canGroundOrCoyote && airJumpsUsed < stats.MaxAirJumps;
 
         if (canGroundOrCoyote || canAirJump)
         {
-            // Optional: zero vertical vel for consistent jump height
             rb.velocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
 
             rb.AddForce(Vector3.up * stats.JumpPower, ForceMode.Impulse);
@@ -145,14 +141,13 @@ public class PlayerMovementController : MonoBehaviour
             jumpQueued = false;
 
             if (!canGroundOrCoyote)
-                airJumpsUsed++; // consume one air jump
+                airJumpsUsed++;
         }
 
         if (jumpQueued && !withinBuffer)
             jumpQueued = false;
     }
 
-    // Variable jump height: if jump is released while rising, add extra downward acceleration
     private void ApplyVariableJumpGravity()
     {
         if (stats == null || !stats.EnableJump) return;
@@ -170,14 +165,11 @@ public class PlayerMovementController : MonoBehaviour
         }
     }
 
-    // ---------------- Input ----------------
 
     private void SubscribeInput(bool subscribe)
     {
         if (inputHandler == null) return;
 
-        // We now poll jump in Update (JumpDownThisFrame/JumpHeld),
-        // but keep sprint events as before.
         if (subscribe)
         {
             inputHandler.OnSprintStart += HandleSprintStart;
@@ -225,7 +217,7 @@ public class PlayerMovementController : MonoBehaviour
         if (isGrounded)
         {
             lastGroundedTime = Time.time;
-            airJumpsUsed = 0; // reset on ground
+            airJumpsUsed = 0;
         }
     }
 }
