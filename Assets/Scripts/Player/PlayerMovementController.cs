@@ -17,16 +17,17 @@ public class PlayerMovementController : MonoBehaviour
     private bool isGrounded;
     private bool isSprinting;
 
-    // Jump variables
+    // Jump assist
     private float lastGroundedTime;      // time we were last on ground
-    private float lastJumpPressedTime;   // time jump was pressed
+    private float lastJumpPressedTime;   // time jump was pressed (buffer)
     private bool jumpQueued;            // we have a jump to try when allowed
 
+    // Advanced jump
+    private int airJumpsUsed;            // air jumps since last grounded
 
     public bool CanMove = true;
 
     private const float DampingFactor = 5f;
-
 
     private void Awake()
     {
@@ -35,6 +36,7 @@ public class PlayerMovementController : MonoBehaviour
 
         rb.interpolation = RigidbodyInterpolation.Interpolate;
         rb.constraints = RigidbodyConstraints.FreezeRotation;
+
         if (cameraTransform == null && Camera.main != null)
             cameraTransform = Camera.main.transform;
     }
@@ -45,21 +47,32 @@ public class PlayerMovementController : MonoBehaviour
     private void Update()
     {
         moveInput = inputHandler.MoveInput;
+
+        // Poll jumping: queue when pressed this frame
+        if (inputHandler.JumpDownThisFrame && stats && stats.EnableJump)
+        {
+            lastJumpPressedTime = Time.time;
+            jumpQueued = true;
+        }
+
         FaceCameraDirection();
         CheckGround();
     }
 
     private void FixedUpdate()
     {
+        HandleJump();                 // consume buffer/coyote/air jumps
         if (CanMove) HandleMovement();
-        HandleJump();
+        ApplyVariableJumpGravity();   // early-release higher gravity while rising
     }
+
+    // ---------------- Movement ----------------
 
     private void HandleMovement()
     {
         if (stats == null) return;
 
-        Vector3 velocity = rb.velocity;
+        Vector3 v = rb.velocity;
 
         if (moveInput != Vector2.zero)
         {
@@ -67,54 +80,121 @@ public class PlayerMovementController : MonoBehaviour
             moveDir = transform.TransformDirection(moveDir);
 
             float speed = isSprinting ? stats.SprintSpeed : stats.WalkSpeed;
+            
+            // Apex Jump
+            bool inApex = !isGrounded && Mathf.Abs(v.y) < stats.ApexDetectionThreshold;
+            if (stats.UseApexControl && inApex)
+            {
+                speed *= stats.ApexModifier;
+            }
+            // --------------------------------------
+
             Vector3 desiredVelocity = moveDir * speed;
-            Vector3 velocityChange = desiredVelocity - velocity;
 
+            // Per-axis acceleration toward desired (ignore Y)
+            Vector3 delta = desiredVelocity - v;
             float maxDelta = stats.MaxVelocityChange;
-            velocityChange.x = Mathf.Clamp(velocityChange.x, -maxDelta, maxDelta);
-            velocityChange.z = Mathf.Clamp(velocityChange.z, -maxDelta, maxDelta);
-            velocityChange.y = 0f;
 
-            rb.AddForce(velocityChange, ForceMode.VelocityChange);
+            float dx = Mathf.Clamp(delta.x, -maxDelta, maxDelta);
+            float dz = Mathf.Clamp(delta.z, -maxDelta, maxDelta);
+
+            rb.AddForce(new Vector3(dx, 0f, dz), ForceMode.VelocityChange);
         }
         else
         {
-            Vector3 horizVel = new Vector3(velocity.x, 0f, velocity.z);
-
-            if (horizVel.sqrMagnitude < 0.01f)
-                rb.velocity = new Vector3(0f, rb.velocity.y, 0f);
+            // Horizontal damping when no input
+            Vector3 horiz = new Vector3(v.x, 0f, v.z);
+            if (horiz.sqrMagnitude < 0.01f)
+            {
+                rb.velocity = new Vector3(0f, v.y, 0f);
+            }
             else
             {
-                Vector3 decel = DampingFactor * Time.fixedDeltaTime * -horizVel;
-                rb.AddForce(decel, ForceMode.VelocityChange);
+                rb.AddForce(-horiz * DampingFactor * Time.fixedDeltaTime, ForceMode.VelocityChange);
             }
         }
     }
 
+
+
+    // ---------------- Jumping ----------------
+
     private void HandleJump()
     {
-        if (stats == null || !stats.EnableJump) { jumpQueued = false; return; }
+        if (stats == null || !stats.EnableJump)
+        {
+            jumpQueued = false;
+            return;
+        }
 
         bool withinBuffer = (Time.time - lastJumpPressedTime) <= stats.JumpBufferTime;
         bool withinCoyote = (Time.time - lastGroundedTime) <= stats.CoyoteTime;
 
-        
-        if (jumpQueued && withinBuffer && (isGrounded || withinCoyote))
+        if (!(jumpQueued && withinBuffer)) return;
+
+        bool canGroundOrCoyote = (isGrounded || withinCoyote);
+        bool canAirJump = (!canGroundOrCoyote && airJumpsUsed < stats.MaxAirJumps);
+
+        if (canGroundOrCoyote || canAirJump)
         {
+            // Optional: zero vertical vel for consistent jump height
             rb.velocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
 
             rb.AddForce(Vector3.up * stats.JumpPower, ForceMode.Impulse);
             isGrounded = false;
-            jumpQueued = false; // consume
-            return;
+            jumpQueued = false;
+
+            if (!canGroundOrCoyote)
+                airJumpsUsed++; // consume one air jump
         }
 
-        // Drop the queued jump if the buffer expired
         if (jumpQueued && !withinBuffer)
             jumpQueued = false;
     }
 
+    // Variable jump height: if jump is released while rising, add extra downward acceleration
+    private void ApplyVariableJumpGravity()
+    {
+        if (stats == null || !stats.EnableJump) return;
+
+        bool rising = rb.velocity.y > 0f;
+        bool holding = inputHandler.JumpHeld;
+
+        if (rising && !holding)
+        {
+            float extraMultiplier = Mathf.Max(0f, stats.EndJumpEarlyExtraForceMultiplier - 1f);
+            if (extraMultiplier > 0f)
+            {
+                rb.AddForce(Vector3.down * Physics.gravity.magnitude * extraMultiplier, ForceMode.Acceleration);
+            }
+        }
+    }
+
+    // ---------------- Input ----------------
+
+    private void SubscribeInput(bool subscribe)
+    {
+        if (inputHandler == null) return;
+
+        // We now poll jump in Update (JumpDownThisFrame/JumpHeld),
+        // but keep sprint events as before.
+        if (subscribe)
+        {
+            inputHandler.OnSprintStart += HandleSprintStart;
+            inputHandler.OnSprintEnd += HandleSprintEnd;
+        }
+        else
+        {
+            inputHandler.OnSprintStart -= HandleSprintStart;
+            inputHandler.OnSprintEnd -= HandleSprintEnd;
+        }
+    }
+
+    private void HandleSprintStart() => isSprinting = true;
+    private void HandleSprintEnd() => isSprinting = false;
+
     // ---------------- Helpers ----------------
+
     private void FaceCameraDirection()
     {
         if (cameraTransform == null) return;
@@ -143,35 +223,9 @@ public class PlayerMovementController : MonoBehaviour
         );
 
         if (isGrounded)
+        {
             lastGroundedTime = Time.time;
-    }
-
-    private void SubscribeInput(bool subscribe)
-    {
-        if (inputHandler == null) return;
-
-        if (subscribe)
-        {
-            inputHandler.OnJump += OnJumpPressed;
-            inputHandler.OnSprintStart += HandleSprintStart;
-            inputHandler.OnSprintEnd += HandleSprintEnd;
-        }
-        else
-        {
-            inputHandler.OnJump -= OnJumpPressed;
-            inputHandler.OnSprintStart -= HandleSprintStart;
-            inputHandler.OnSprintEnd -= HandleSprintEnd;
+            airJumpsUsed = 0; // reset on ground
         }
     }
-
-    private void OnJumpPressed()
-    {
-        if (!stats || !stats.EnableJump) return;
-        lastJumpPressedTime = Time.time;
-        jumpQueued = true;
-    }
-
-    private void HandleSprintStart() => isSprinting = true;
-    private void HandleSprintEnd() => isSprinting = false;
-
 }
