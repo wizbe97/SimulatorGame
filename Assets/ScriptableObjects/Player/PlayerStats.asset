@@ -25,4 +25,9 @@ MonoBehaviour:
   JumpPower: 5
   CoyoteTime: 0.15
   JumpBufferTime: 0.15
+  EndJumpEarlyExtraForceMultiplier: 3
+  MaxAirJumps: 1
+  UseApexControl: 1
+  ApexModifier: 1.3
+  ApexDetectionThreshold: 1.5
   GroundCheckDistance: 0.75
