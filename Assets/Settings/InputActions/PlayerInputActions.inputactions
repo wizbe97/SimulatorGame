@@ -151,15 +151,6 @@
             "id": "0c7b3fe3-f514-4c9a-bc8e-62298d81e621",
             "actions": [
                 {
-                    "name": "New action",
-                    "type": "Button",
-                    "id": "6dc2843e-0490-45ed-b47e-d5f9f858f0b7",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
                     "name": "Look",
                     "type": "Value",
                     "id": "6615da8a-6180-469c-8b4a-c4870eab56bb",
@@ -179,17 +170,6 @@
                 }
             ],
             "bindings": [
-                {
-                    "name": "",
-                    "id": "6f35788c-f050-4621-a139-8704b0d90e36",
-                    "path": "",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "New action",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
                 {
                     "name": "",
                     "id": "4d900aee-fcef-461c-baba-def4d2d809eb",

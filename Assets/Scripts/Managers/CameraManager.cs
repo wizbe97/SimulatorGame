@@ -1,55 +1,68 @@
 using UnityEngine;
+using Cinemachine;
 
-[RequireComponent(typeof(PlayerInputHandler))]
 public class CameraManager : MonoBehaviour
 {
+    public static CameraManager Instance { get; private set; }
+
     [Header("References")]
-    [SerializeField] private CameraControllerSO cameraSettings;
-    [SerializeField] private Camera playerCamera;
-    [SerializeField] private Transform playerRoot; // yaw target (usually the player root)
+    [SerializeField] private GameObject player;
+    [SerializeField] private CinemachineVirtualCamera vcam;
+    [SerializeField] private CameraSettingsSO cameraSettings;
+
+    [Header("Follow Target (under player)")]
+    [SerializeField] private string followTargetPath = "Goggles/CameraFollow";
 
     private PlayerInputHandler inputHandler;
-    private float yaw;
-    private float pitch;
+    private CinemachinePOV pov;
 
     private void Awake()
     {
-        inputHandler = GetComponent<PlayerInputHandler>();
-        if (playerRoot == null) playerRoot = transform;
-
-        if (playerCamera != null)
+        if (Instance != null && Instance != this)
         {
-            // Apply SO-defined local offset (if any)
-            playerCamera.transform.localPosition = cameraSettings != null
-                ? cameraSettings.CameraLocalOffset
-                : Vector3.zero;
+            Destroy(gameObject);
+            return;
         }
 
-        // Initial cursor state via CursorManager
-        if (cameraSettings != null && cameraSettings.LockCursorOnStart)
-        {
-            CursorManager.Instance?.SetCursorLock(true);
-        }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
     }
+
+    private void Start() => Bind();
 
     private void Update()
     {
-        if (cameraSettings == null || playerCamera == null || inputHandler == null)
-            return;
+        if (pov == null || inputHandler == null || cameraSettings == null) return;
 
         Vector2 look = inputHandler.LookInput;
+        float delta = inputHandler.GetLookSensitivity(cameraSettings) * 2f * Time.deltaTime;
 
-        float scaledSensitivity = cameraSettings.MouseSensitivity * Time.deltaTime;
-        yaw   += look.x * scaledSensitivity;
-        pitch -= look.y * scaledSensitivity;
+        pov.m_HorizontalAxis.Value += look.x * delta;
 
-        pitch = Mathf.Clamp(pitch, -cameraSettings.MaxLookAngle, cameraSettings.MaxLookAngle);
-
-        // Apply rotations: yaw to player, pitch to camera
-        if (playerRoot != null)
-            playerRoot.rotation = Quaternion.Euler(0f, yaw, 0f);
-
-        playerCamera.transform.localRotation = Quaternion.Euler(pitch, 0f, 0f);
+        float ySign = cameraSettings.InvertY ? 1f : -1f;
+        pov.m_VerticalAxis.Value += look.y * delta * ySign;
     }
 
+    private void Bind()
+    {
+        if (vcam == null) vcam = FindObjectOfType<CinemachineVirtualCamera>();
+        if (player == null || vcam == null) return;
+
+        inputHandler = player.GetComponent<PlayerInputHandler>();
+        pov = vcam.GetCinemachineComponent<CinemachinePOV>();
+        cameraSettings?.ConfigureVcam(vcam);
+
+        Transform follow = string.IsNullOrEmpty(followTargetPath)
+            ? null
+            : player.transform.Find(followTargetPath);
+
+        vcam.Follow = follow ? follow : player.transform;
+        vcam.LookAt = vcam.Follow;
+    }
+
+    public void RebindToPlayer(GameObject newPlayer)
+    {
+        player = newPlayer;
+        Bind();
+    }
 }
