@@ -16,15 +16,11 @@ public class PlayerMovementController : MonoBehaviour
     private Vector2 moveInput;
     private bool isGrounded;
     private bool isSprinting;
+    private float lastGroundedTime;
+    private float lastJumpPressedTime;
+    private bool jumpQueued;
 
-    // Jump assist
-    private float lastGroundedTime;      // time we were last on ground
-    private float lastJumpPressedTime;   // time jump was pressed (buffer)
-    private bool jumpQueued;            // we have a jump to try when allowed
-
-    // Advanced jump
-    private int airJumpsUsed;            // air jumps since last grounded
-
+    private int airJumpsUsed;
     public bool CanMove = true;
 
     private const float DampingFactor = 5f;
@@ -53,12 +49,10 @@ public class PlayerMovementController : MonoBehaviour
 
     private void FixedUpdate()
     {
-        HandleJump();                 // consume buffer/coyote/air jumps
+        HandleJump();
         if (CanMove) HandleMovement();
-        ApplyVariableJumpGravity();   // early-release higher gravity while rising
+        ApplyVariableJumpGravity();
     }
-
-    // ---------------- Movement ----------------
 
     private void HandleInput()
     {
