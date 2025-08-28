@@ -10,10 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8fe0dcf4f25608d40ae9109d6b6fd641, type: 3}
-  m_Name: CameraControllerSO
+  m_Name: CameraSettings
   m_EditorClassIdentifier: 
-  Body: 0
   MouseSensitivity: 10
+  ControllerSensitivity: 150
   MaxLookAngle: 80
-  InvertY: 1
+  InvertY: 0
   WrapYaw: 1
+  Body: 0

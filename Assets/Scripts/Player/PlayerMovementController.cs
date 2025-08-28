@@ -6,7 +6,8 @@ public class PlayerMovementController : MonoBehaviour
 {
     [SerializeField] private PlayerStatsSO stats;
 
-    // NEW: camera reference (assign in Inspector or auto-grab Main Camera)
+    [Header("Optional")]
+    [Tooltip("If left empty, will use Camera.main at runtime.")]
     [SerializeField] private Transform cameraTransform;
 
     private Rigidbody rb;
@@ -18,55 +19,33 @@ public class PlayerMovementController : MonoBehaviour
 
     public bool CanMove = true;
 
+    private const float DampingFactor = 5f;
+
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
         inputHandler = GetComponent<PlayerInputHandler>();
 
         rb.interpolation = RigidbodyInterpolation.Interpolate;
-        rb.constraints = RigidbodyConstraints.FreezeRotation; // prevent tipping
-
+        rb.constraints = RigidbodyConstraints.FreezeRotation;
         if (cameraTransform == null && Camera.main != null)
             cameraTransform = Camera.main.transform;
     }
 
-    private void OnEnable()
-    {
-        if (inputHandler == null) return;
-        inputHandler.OnJump += HandleJump;
-        inputHandler.OnSprintStart += HandleSprintStart;
-        inputHandler.OnSprintEnd += HandleSprintEnd;
-    }
-
-    private void OnDisable()
-    {
-        if (inputHandler == null) return;
-        inputHandler.OnJump -= HandleJump;
-        inputHandler.OnSprintStart -= HandleSprintStart;
-        inputHandler.OnSprintEnd -= HandleSprintEnd;
-    }
+    private void OnEnable() => SubscribeInput(true);
+    private void OnDisable() => SubscribeInput(false);
 
     private void Update()
     {
-        moveInput = inputHandler != null ? inputHandler.MoveInput : Vector2.zero;
-
-        if (cameraTransform == null && Camera.main != null)
-            cameraTransform = Camera.main.transform;
-
-        if (cameraTransform != null)
-        {
-            var e = transform.eulerAngles;
-            e.y = cameraTransform.eulerAngles.y;
-            transform.eulerAngles = e;
-        }
-
+        moveInput = inputHandler.MoveInput;
+        FaceCameraDirection();
         CheckGround();
     }
 
     private void FixedUpdate()
     {
-        if (!CanMove) return;
-        HandleMovement();
+        if (CanMove) HandleMovement();
     }
 
     private void HandleMovement()
@@ -80,10 +59,11 @@ public class PlayerMovementController : MonoBehaviour
             Vector3 moveDir = new Vector3(moveInput.x, 0f, moveInput.y);
             moveDir = transform.TransformDirection(moveDir);
 
-            float targetSpeed = isSprinting ? stats.SprintSpeed : stats.WalkSpeed;
-            Vector3 desired = moveDir * targetSpeed;
+            float speed = isSprinting ? stats.SprintSpeed : stats.WalkSpeed;
+            Vector3 desiredVelocity = moveDir * speed;
 
-            Vector3 velocityChange = desired - velocity;
+            // Change from current to desiredVelocity, clamped per-axis
+            Vector3 velocityChange = desiredVelocity - velocity;
 
             float maxDelta = stats.MaxVelocityChange;
             velocityChange.x = Mathf.Clamp(velocityChange.x, -maxDelta, maxDelta);
@@ -94,21 +74,22 @@ public class PlayerMovementController : MonoBehaviour
         }
         else
         {
-            const float dampingFactor = 5f;
+            // Horizontal damping when no input
             Vector3 horizVel = new Vector3(velocity.x, 0f, velocity.z);
-            Vector3 decel = -horizVel * dampingFactor * Time.fixedDeltaTime;
 
             if (horizVel.sqrMagnitude < 0.01f)
                 rb.velocity = new Vector3(0f, rb.velocity.y, 0f);
             else
+            {
+                Vector3 decel = DampingFactor * Time.fixedDeltaTime * -horizVel;
                 rb.AddForce(decel, ForceMode.VelocityChange);
+            }
         }
     }
 
     private void HandleJump()
     {
-        if (stats == null) return;
-        if (!stats.EnableJump || !isGrounded) return;
+        if (stats == null || !stats.EnableJump || !isGrounded) return;
 
         rb.AddForce(Vector3.up * stats.JumpPower, ForceMode.Impulse);
         isGrounded = false;
@@ -117,11 +98,21 @@ public class PlayerMovementController : MonoBehaviour
     private void HandleSprintStart() => isSprinting = true;
     private void HandleSprintEnd() => isSprinting = false;
 
+    // ---------------- Helpers ----------------
+    private void FaceCameraDirection()
+    {
+        if (cameraTransform == null) return;
+
+        Vector3 euler = transform.eulerAngles;
+        euler.y = cameraTransform.eulerAngles.y;
+        transform.eulerAngles = euler;
+    }
+
     private void CheckGround()
     {
         if (stats == null) { isGrounded = false; return; }
 
-        Vector3 origin = new Vector3(
+        Vector3 origin = new(
             transform.position.x,
             transform.position.y - (transform.localScale.y * 0.5f),
             transform.position.z
@@ -134,5 +125,23 @@ public class PlayerMovementController : MonoBehaviour
             stats.CollisionLayers,
             QueryTriggerInteraction.Ignore
         );
+    }
+
+    private void SubscribeInput(bool subscribe)
+    {
+        if (inputHandler == null) return;
+
+        if (subscribe)
+        {
+            inputHandler.OnJump += HandleJump;
+            inputHandler.OnSprintStart += HandleSprintStart;
+            inputHandler.OnSprintEnd += HandleSprintEnd;
+        }
+        else
+        {
+            inputHandler.OnJump -= HandleJump;
+            inputHandler.OnSprintStart -= HandleSprintStart;
+            inputHandler.OnSprintEnd -= HandleSprintEnd;
+        }
     }
 }

@@ -26,6 +26,11 @@ public class PlayerStatsSO : ScriptableObject
 
     [Tooltip("Upward impulse applied when jumping.")]
     public float JumpPower = 5f;
+    [Tooltip("Grace window after leaving ground in which a jump still succeeds.")]
+    public float CoyoteTime = 0.15f;
+
+    [Tooltip("Window before landing in which a jump press will be buffered.")]
+    public float JumpBufferTime = 0.25f;
 
     [Header("Grounding")]
     [Tooltip("Extra distance for ground raycast.")]

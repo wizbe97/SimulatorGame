@@ -8,35 +8,34 @@ public class CameraManager : MonoBehaviour
     [Header("References")]
     [SerializeField] private GameObject player;
     [SerializeField] private CinemachineVirtualCamera vcam;
-    [SerializeField] private CameraControllerSO cameraSettings;
+    [SerializeField] private CameraSettingsSO cameraSettings;
+
+    [Header("Follow Target (under player)")]
+    [SerializeField] private string followTargetPath = "Goggles/CameraFollow";
 
     private PlayerInputHandler inputHandler;
     private CinemachinePOV pov;
 
     private void Awake()
     {
-        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         Instance = this;
         DontDestroyOnLoad(gameObject);
     }
 
-    private void Start()
-    {
-        if (vcam == null) vcam = FindObjectOfType<CinemachineVirtualCamera>();
-
-        BindPlayerCameraRig();
-        cameraSettings?.ConfigureVcam(vcam);
-
-        pov = vcam != null ? vcam.GetCinemachineComponent<CinemachinePOV>() : null;
-        inputHandler = player != null ? player.GetComponent<PlayerInputHandler>() : null;
-    }
+    private void Start() => Bind();
 
     private void Update()
     {
         if (pov == null || inputHandler == null || cameraSettings == null) return;
 
         Vector2 look = inputHandler.LookInput;
-        float delta = cameraSettings.MouseSensitivity * 2f * Time.deltaTime;
+        float delta = inputHandler.GetLookSensitivity(cameraSettings) * 2f * Time.deltaTime;
 
         pov.m_HorizontalAxis.Value += look.x * delta;
 
@@ -44,27 +43,26 @@ public class CameraManager : MonoBehaviour
         pov.m_VerticalAxis.Value += look.y * delta * ySign;
     }
 
-    private void BindPlayerCameraRig()
+    private void Bind()
     {
-        if (vcam == null || player == null) return;
+        if (vcam == null) vcam = FindObjectOfType<CinemachineVirtualCamera>();
+        if (player == null || vcam == null) return;
 
-        var followTarget = player.transform.Find("Goggles/CameraFollow");
-        if (followTarget == null)
-        {
-            Debug.LogError("CameraManager: 'Goggles/CameraFollow' not found under Player.");
-            return;
-        }
+        inputHandler = player.GetComponent<PlayerInputHandler>();
+        pov = vcam.GetCinemachineComponent<CinemachinePOV>();
+        cameraSettings?.ConfigureVcam(vcam);
 
-        vcam.Follow = followTarget;
-        vcam.LookAt = followTarget;
+        Transform follow = string.IsNullOrEmpty(followTargetPath)
+            ? null
+            : player.transform.Find(followTargetPath);
+
+        vcam.Follow = follow ? follow : player.transform;
+        vcam.LookAt = vcam.Follow;
     }
 
     public void RebindToPlayer(GameObject newPlayer)
     {
         player = newPlayer;
-        inputHandler = player != null ? player.GetComponent<PlayerInputHandler>() : null;
-        BindPlayerCameraRig();
-        cameraSettings?.ConfigureVcam(vcam);
-        pov = vcam != null ? vcam.GetCinemachineComponent<CinemachinePOV>() : null;
+        Bind();
     }
 }
