@@ -46,6 +46,7 @@ GameObject:
   - component: {fileID: 7256166374999332876}
   - component: {fileID: 5978157554723101820}
   - component: {fileID: 8076015762529469077}
+  - component: {fileID: 562662451495537503}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -196,6 +197,24 @@ MonoBehaviour:
   stats: {fileID: 11400000, guid: a024e2864fb335d45959af385f8cf899, type: 2}
   cameraTransform: {fileID: 0}
   CanMove: 1
+--- !u!114 &562662451495537503
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3480056868173529367}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 64d87489bfa37e84184fb026ecc7cde3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  pickableLayerMask:
+    serializedVersion: 2
+    m_Bits: 512
+  playerCameraTransform: {fileID: 0}
+  pickUpUI: {fileID: 0}
+  hitRange: 3
 --- !u!1 &7181493390937184802
 GameObject:
   m_ObjectHideFlags: 0
