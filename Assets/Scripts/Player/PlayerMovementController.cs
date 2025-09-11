@@ -159,7 +159,6 @@ public class PlayerMovementController : MonoBehaviour
         }
     }
 
-
     private void SubscribeInput(bool subscribe)
     {
         if (inputHandler == null) return;

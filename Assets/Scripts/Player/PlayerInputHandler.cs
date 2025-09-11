@@ -16,6 +16,9 @@ public class PlayerInputHandler : MonoBehaviour
     public delegate void InputActionEvent();
     public event InputActionEvent OnSprintStart;
     public event InputActionEvent OnSprintEnd;
+    public event InputActionEvent OnPickUpItem;
+    public event InputActionEvent OnPlaceItem;
+
 
     private void Awake()
     {
@@ -29,34 +32,40 @@ public class PlayerInputHandler : MonoBehaviour
 
         // Move
         inputActions.Movement.Move.performed += OnMovePerformed;
-        inputActions.Movement.Move.canceled  += OnMoveCanceled;
+        inputActions.Movement.Move.canceled += OnMoveCanceled;
 
         // Jump
-        inputActions.Movement.Jump.started   += OnJumpStarted;
-        inputActions.Movement.Jump.canceled  += OnJumpCanceled;
+        inputActions.Movement.Jump.started += OnJumpStarted;
+        inputActions.Movement.Jump.canceled += OnJumpCanceled;
 
         // Sprint
         inputActions.Movement.Sprint.performed += OnSprintPerformed;
-        inputActions.Movement.Sprint.canceled  += OnSprintCanceled;
+        inputActions.Movement.Sprint.canceled += OnSprintCanceled;
 
         // Look
         inputActions.Camera.Look.performed += OnLookPerformed;
-        inputActions.Camera.Look.canceled  += OnLookCanceled;
+        inputActions.Camera.Look.canceled += OnLookCanceled;
+
+        inputActions.Interaction.PickUpItem.performed += OnPickUpItemPerformed;
+        inputActions.Interaction.PlaceItem.performed += OnPlaceItemPerformed;
     }
 
     private void OnDisable()
     {
         inputActions.Movement.Move.performed -= OnMovePerformed;
-        inputActions.Movement.Move.canceled  -= OnMoveCanceled;
+        inputActions.Movement.Move.canceled -= OnMoveCanceled;
 
-        inputActions.Movement.Jump.started   -= OnJumpStarted;
-        inputActions.Movement.Jump.canceled  -= OnJumpCanceled;
+        inputActions.Movement.Jump.started -= OnJumpStarted;
+        inputActions.Movement.Jump.canceled -= OnJumpCanceled;
 
         inputActions.Movement.Sprint.performed -= OnSprintPerformed;
-        inputActions.Movement.Sprint.canceled  -= OnSprintCanceled;
+        inputActions.Movement.Sprint.canceled -= OnSprintCanceled;
 
         inputActions.Camera.Look.performed -= OnLookPerformed;
-        inputActions.Camera.Look.canceled  -= OnLookCanceled;
+        inputActions.Camera.Look.canceled -= OnLookCanceled;
+
+        inputActions.Interaction.PickUpItem.performed -= OnPickUpItemPerformed;
+        inputActions.Interaction.PlaceItem.performed -= OnPlaceItemPerformed;
 
         inputActions.Disable();
     }
@@ -69,35 +78,36 @@ public class PlayerInputHandler : MonoBehaviour
     // -------- Handlers --------
 
     private void OnMovePerformed(InputAction.CallbackContext ctx) => MoveInput = ctx.ReadValue<Vector2>();
-    private void OnMoveCanceled (InputAction.CallbackContext ctx) => MoveInput = Vector2.zero;
+    private void OnMoveCanceled(InputAction.CallbackContext ctx) => MoveInput = Vector2.zero;
 
     private void OnJumpStarted(InputAction.CallbackContext ctx)
     {
-        // This maps to "WasPressedThisFrame"
-        JumpDownThisFrame = true;
+        JumpDownThisFrame = true; // maps to "WasPressedThisFrame"
         JumpHeld = true;
     }
 
-    private void OnJumpCanceled(InputAction.CallbackContext ctx)
-    {
-        JumpHeld = false;
-    }
+    private void OnJumpCanceled(InputAction.CallbackContext ctx) => JumpHeld = false;
 
     private void OnSprintPerformed(InputAction.CallbackContext ctx) => OnSprintStart?.Invoke();
-    private void OnSprintCanceled (InputAction.CallbackContext ctx) => OnSprintEnd?.Invoke();
+    private void OnSprintCanceled(InputAction.CallbackContext ctx) => OnSprintEnd?.Invoke();
 
     private void OnLookPerformed(InputAction.CallbackContext ctx)
     {
         LookInput = ctx.ReadValue<Vector2>();
 
         var device = ctx.control.device;
-        if      (device is Mouse)   LastLookDevice = LookDevice.Mouse;
+        if (device is Mouse) LastLookDevice = LookDevice.Mouse;
         else if (device is Gamepad) LastLookDevice = LookDevice.Gamepad;
         else if (device is Pointer) LastLookDevice = LookDevice.Pointer;
-        else                        LastLookDevice = LookDevice.Unknown;
+        else LastLookDevice = LookDevice.Unknown;
     }
 
     private void OnLookCanceled(InputAction.CallbackContext ctx) => LookInput = Vector2.zero;
+
+    // 👇 New
+    private void OnPickUpItemPerformed(InputAction.CallbackContext ctx) => OnPickUpItem?.Invoke();
+    private void OnPlaceItemPerformed(InputAction.CallbackContext ctx) => OnPlaceItem?.Invoke();
+
 
     // Sensitivity helper
     public float GetLookSensitivity(CameraSettingsSO settings)
@@ -105,9 +115,9 @@ public class PlayerInputHandler : MonoBehaviour
         switch (LastLookDevice)
         {
             case LookDevice.Mouse:
-            case LookDevice.Pointer:  return settings.MouseSensitivity;
-            case LookDevice.Gamepad:  return settings.ControllerSensitivity;
-            default:                  return settings.MouseSensitivity;
+            case LookDevice.Pointer: return settings.MouseSensitivity;
+            case LookDevice.Gamepad: return settings.ControllerSensitivity;
+            default: return settings.MouseSensitivity;
         }
     }
 }
