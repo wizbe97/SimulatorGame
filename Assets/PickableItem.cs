@@ -3,10 +3,16 @@ using UnityEngine;
 [RequireComponent(typeof(Collider))]
 public class PickableItem : MonoBehaviour, IPickable
 {
+    [SerializeField] private float minPlacementDistance = 2f;   // minimum push away from player
+
     private Collider col;
     private Highlight highlight;
     private Transform originalParent;
     private bool isColliding;
+
+    private float pickupDistance;
+    private float lockedY;              // lock Y height at pickup
+    private Quaternion lockedRotation;  // lock rotation at pickup
 
     private void Awake()
     {
@@ -18,76 +24,83 @@ public class PickableItem : MonoBehaviour, IPickable
     {
         originalParent = transform.parent;
 
-        // Temporarily make collider a trigger so it doesn’t push physics
+        // Make collider a trigger while held
         col.isTrigger = true;
 
-        // Snap to hand (localPosition/Rotation reset relative to parent)
-        transform.SetParent(newParent, false);
-        transform.localPosition = Vector3.zero;
-        transform.localRotation = Quaternion.identity;
+        // Save world rotation & Y height at pickup
+        lockedRotation = transform.rotation;
+        lockedY = transform.position.y;
+
+        // Calculate distance from player
+        pickupDistance = Vector3.Distance(newParent.position, transform.position);
+        if (pickupDistance < minPlacementDistance)
+            pickupDistance = minPlacementDistance;
+
+        // Reparent to player but keep world transform
+        transform.SetParent(newParent, true);
 
         return gameObject;
     }
 
     public void Place()
     {
-        // Reset collider
         col.isTrigger = false;
+        highlight?.ResetToDefault();
 
-        // Reset highlight state back to original
-        if (highlight != null)
-        {
-            highlight.ResetToDefault();
-        }
-
-        // Drop back into world
+        // Detach from player
         transform.SetParent(null, true);
 
-        // Raycast down to place on ground
-        if (Physics.Raycast(transform.position, Vector3.down, out RaycastHit hitInfo, 10f))
-        {
-            Vector3 newPos = hitInfo.point;
+        // Snap to grid but keep locked Y
+        Vector3 snapped = GridManager.Instance.SnapToGrid(transform.position);
+        snapped.y = lockedY;
 
-            if (!(col is MeshCollider))
-            {
-                // Only add extents if collider is not a MeshCollider
-                float halfHeight = col.bounds.extents.y;
-                newPos.y += halfHeight;
-            }
-
-            transform.position = newPos;
-        }
+        transform.position = snapped;
+        transform.rotation = lockedRotation;
     }
 
     public void OnHeld()
     {
         if (highlight == null) return;
 
-        // Show green if no collision, red if colliding
-        if (isColliding)
+        if (transform.parent != null)
         {
-            highlight.ShowInvalidPlacement();
+            // Use full forward (with pitch)
+            Vector3 dir = transform.parent.forward.normalized;
+
+            // Move object along forward vector
+            Vector3 targetPos = transform.parent.position + dir * pickupDistance;
+
+            // Snap to grid, but force Y to locked height
+            targetPos = GridManager.Instance.SnapToGrid(targetPos);
+            targetPos.y = lockedY;
+
+            transform.position = targetPos;
+            transform.rotation = lockedRotation;
         }
-        else
-        {
-            highlight.ShowValidPlacement();
-        }
+
+        // Placement validity
+        if (isColliding) highlight.ShowInvalidPlacement();
+        else highlight.ShowValidPlacement();
     }
+
 
     public void OnDropped()
     {
         highlight?.ResetToDefault();
     }
 
-    // Trigger checks while held
     private void OnTriggerEnter(Collider other)
     {
-        if (col.isTrigger) isColliding = true;
+        if (!col.isTrigger) return;
+        if (other.gameObject.layer == LayerMask.NameToLayer("Ground")) return;
+        isColliding = true;
     }
 
     private void OnTriggerExit(Collider other)
     {
-        if (col.isTrigger) isColliding = false;
+        if (!col.isTrigger) return;
+        if (other.gameObject.layer == LayerMask.NameToLayer("Ground")) return;
+        isColliding = false;
     }
 
     public bool CanPlace() => !isColliding;
