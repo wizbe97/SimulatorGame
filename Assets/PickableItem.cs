@@ -3,16 +3,16 @@ using UnityEngine;
 [RequireComponent(typeof(Collider))]
 public class PickableItem : MonoBehaviour, IPickable
 {
-    [SerializeField] private float minPlacementDistance = 2f;   // minimum push away from player
-
     private Collider col;
     private Highlight highlight;
     private Transform originalParent;
     private bool isColliding;
 
-    private float pickupDistance;
     private float lockedY;              // lock Y height at pickup
     private Quaternion lockedRotation;  // lock rotation at pickup
+
+    // optional cache so we still satisfy IPickable.OnHeld()
+    private float cachedDistance;
 
     private void Awake()
     {
@@ -31,11 +31,6 @@ public class PickableItem : MonoBehaviour, IPickable
         lockedRotation = transform.rotation;
         lockedY = transform.position.y;
 
-        // Calculate distance from player
-        pickupDistance = Vector3.Distance(newParent.position, transform.position);
-        if (pickupDistance < minPlacementDistance)
-            pickupDistance = minPlacementDistance;
-
         // Reparent to player but keep world transform
         transform.SetParent(newParent, true);
 
@@ -50,7 +45,7 @@ public class PickableItem : MonoBehaviour, IPickable
         // Detach from player
         transform.SetParent(null, true);
 
-        // Snap to grid but keep locked Y
+        // Snap to grid, keep locked Y
         Vector3 snapped = GridManager.Instance.SnapToGrid(transform.position);
         snapped.y = lockedY;
 
@@ -58,31 +53,40 @@ public class PickableItem : MonoBehaviour, IPickable
         transform.rotation = lockedRotation;
     }
 
+    // Interface requirement; delegates to cached value (set every frame by OnHeld(distance))
     public void OnHeld()
     {
+        OnHeld(cachedDistance);
+    }
+
+    // Called by PlayerInteraction with the computed distance each frame
+    public void OnHeld(float placeDistance)
+    {
+        cachedDistance = placeDistance; // keep for interface call
+
         if (highlight == null) return;
 
         if (transform.parent != null)
         {
-            // Use full forward (with pitch)
-            Vector3 dir = transform.parent.forward.normalized;
+            // Move along player's forward on XZ plane by the provided distance
+            Vector3 dir = transform.parent.forward;
+            dir.y = 0f;                // don't tilt with pitch; pitch only affects the distance we were given
+            if (dir.sqrMagnitude > 0f) dir.Normalize();
 
-            // Move object along forward vector
-            Vector3 targetPos = transform.parent.position + dir * pickupDistance;
+            Vector3 targetPos = transform.parent.position + dir * placeDistance;
 
-            // Snap to grid, but force Y to locked height
+            // Snap to global grid, keep locked Y
             targetPos = GridManager.Instance.SnapToGrid(targetPos);
             targetPos.y = lockedY;
 
             transform.position = targetPos;
-            transform.rotation = lockedRotation;
+            transform.rotation = lockedRotation; // never rotate with player
         }
 
-        // Placement validity
+        // Highlight validity
         if (isColliding) highlight.ShowInvalidPlacement();
-        else highlight.ShowValidPlacement();
+        else             highlight.ShowValidPlacement();
     }
-
 
     public void OnDropped()
     {
@@ -92,14 +96,14 @@ public class PickableItem : MonoBehaviour, IPickable
     private void OnTriggerEnter(Collider other)
     {
         if (!col.isTrigger) return;
-        if (other.gameObject.layer == LayerMask.NameToLayer("Ground")) return;
+        if (other.gameObject.layer == LayerMask.NameToLayer("Ground")) return; // ignore ground
         isColliding = true;
     }
 
     private void OnTriggerExit(Collider other)
     {
         if (!col.isTrigger) return;
-        if (other.gameObject.layer == LayerMask.NameToLayer("Ground")) return;
+        if (other.gameObject.layer == LayerMask.NameToLayer("Ground")) return; // ignore ground
         isColliding = false;
     }
 

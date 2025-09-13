@@ -288,7 +288,8 @@ MonoBehaviour:
   pickableLayerMask:
     serializedVersion: 2
     m_Bits: 512
-  hitRange: 3
+  minPlacementDistance: 1
+  maxPlacementDistance: 3
   pickUpParent: {fileID: 4557760738191747264}
   inHandItem: {fileID: 0}
 --- !u!1 &2289512198866162494

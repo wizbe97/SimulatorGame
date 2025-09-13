@@ -7,7 +7,8 @@ public interface IPickable
     GameObject PickUp(Transform newParent);
     void Place();
 
-    void OnHeld();
+    void OnHeld(float placeDistance);
     void OnDropped();
 }
+
 
